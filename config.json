@@ -1,0 +1,5 @@
+{
+	"name": "FES App Server",
+	"port": 8080,
+	"protocol": "HTTP"
+}
