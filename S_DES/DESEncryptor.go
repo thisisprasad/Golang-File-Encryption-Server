@@ -80,7 +80,8 @@ func (encryptor *DesEncryptor) writeEncryptionBufferToFile(encryptionBuffer *[][
 	if os.IsNotExist(err) {
 		_, ferr := os.Create(filename)
 		if ferr != nil {
-			log.Fatalln("Problem encrypting file", ferr)
+			log.Println("Problem encrypting file", ferr, "File not found in the system")
+			return
 		}
 	}
 	//	write byte array to buffer
@@ -122,7 +123,7 @@ func (encryptor *DesEncryptor) runEncryption(filename string) {
 
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Fatalln("Problem encrypting file", err)
+		log.Println("Problem encrypting file", err)
 		return
 	}
 	defer file.Close()
@@ -130,7 +131,8 @@ func (encryptor *DesEncryptor) runEncryption(filename string) {
 	//	Create encryption file
 	_, err = os.Create(encryptor.encryptionFilename)
 	if err != nil {
-		log.Fatalln("Problem encrypting file", err)
+		log.Println("Problem encrypting file", err)
+		return
 	}
 
 	var buffer []byte
@@ -190,26 +192,58 @@ func (engine *DesEncryptor) runDecryption(filename string) {
 }
 
 /**
-public File-encryption API
+public File-encryption API.
+@return: boolean value. True if encryption is successful and encrypted file
+		is created successfully on the disk. Otherwise false is returned.
 */
-func (encryptor *DesEncryptor) EncryptFile(filename string) {
+func (encryptor *DesEncryptor) EncryptFile(filename string) bool {
+	log.Println("file for encryption:", filename)
 	log.Println("File-Encryption procedure started...")
 
 	encryptor.filename = filename
 	encryptor.encryptionFilename = filename + ".enc"
-	// encryptor.cipher.Init("des_input.txt")
 	encryptor.runEncryption(filename)
 
+	//	Check whether a file of same size is created as the original
+	//	file on the disk.
+	primaryFileStat, err := os.Stat(filename)
+	if err != nil {
+		log.Println("Encryption failure for file:", filename)
+		return false
+	}
+	primaryFileSize := primaryFileStat.Size()
+
+	encryptedFileStat, err := os.Stat(encryptor.encryptionFilename)
+	if err != nil {
+		log.Println("Encryption failure for file:", encryptor.encryptionFilename)
+		return false
+	}
+	encryptedFileSize := encryptedFileStat.Size()
+	if encryptedFileSize != primaryFileSize {
+		log.Println("Encryption Failure. Try again...")
+		return false
+	}
+
+	//	File encryption is successful. Delete the primary file from disk.
+	err = os.Remove(filename)
+	if err != nil {
+		log.Println("Encryption failure for file:", encryptor.encryptionFilename, err)
+		return false
+	}
+
 	log.Println("File-Encryption procedure complete...")
+	return true
 }
 
 /**
-Public Decryption API
+Public Decryption API.
+@return: boolean value. True if decryption is successful and decrypted file
+		is created successfully on the disk. Otherwise false is returned.
 */
-func (engine *DesEncryptor) DecryptFile(filename string) {
+func (engine *DesEncryptor) DecryptFile(filename string) bool {
 	log.Println("Decryption procedure started...")
 
-	engine.decryptionFilename = "dec." + filename
+	engine.decryptionFilename = filename
 	engine.encryptionFilename = filename + ".enc"
 	var err error
 	engine.decryptionFileConnector, err = os.Create(engine.decryptionFilename)
@@ -224,7 +258,27 @@ func (engine *DesEncryptor) DecryptFile(filename string) {
 	engine.runDecryption(filename)
 	engine.decryptionFileConnector.Close()
 
+	//	Delete the encrypted file and keep the decrypted(which is the primary file) file
+	encryptedFileStat, err := os.Stat(engine.encryptionFilename)
+	if err != nil {
+		log.Println("decryption failure for file:", engine.decryptionFilename)
+		return false
+	}
+	encryptedFileSize := encryptedFileStat.Size()
+
+	decryptedFileStat, err := os.Stat(engine.decryptionFilename)
+	if err != nil {
+		log.Println("decryption failure for file:", engine.decryptionFilename)
+		return false
+	}
+	decryptedFileSize := decryptedFileStat.Size()
+	if encryptedFileSize != decryptedFileSize {
+		log.Println("Decryption failed! Try again")
+		return false
+	}
+
 	log.Println("Decryption procedure complete...")
+	return true
 }
 
 func (engine *DesEncryptor) Init(filename string) {

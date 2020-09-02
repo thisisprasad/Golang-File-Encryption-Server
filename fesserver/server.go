@@ -48,9 +48,12 @@ func encryptFile(w http.ResponseWriter, r *http.Request) {
 		log.Println("No parameter 'filename' in the URL")
 	}
 	// var fesengine S_DES.DesEncryptor
-	prop.Fesengine.EncryptFile(filename[0])
-	response.Result = true
-	response.Message = "file encrypted successfully"
+	response.Result = prop.Fesengine.EncryptFile(filename[0])
+	if response.Result {
+		response.Message = "File encrypted successfully"
+	} else {
+		response.Message = "File encryption failed!"
+	}
 	// response.SetToSimpleJSON()
 	WriteToResponseStream(w, response.SetToSimpleJSON(), "application/json")
 }
