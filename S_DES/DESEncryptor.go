@@ -1,9 +1,13 @@
 package S_DES
 
 import (
+	"encoding/json"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
+	"sync"
+	"time"
 )
 
 const (
@@ -16,6 +20,9 @@ type DesEncryptor struct {
 	cipher                  DES_8encryption
 	decryptionFileConnector *os.File
 	decryptionFilename      string
+	Fastmode                bool `json:"fastmode"`
+	ConcurrentPaths         int  `json:"threadcount"`
+	Chunksize               int  `json:"buffersize"`
 }
 
 func (encryptor *DesEncryptor) getBinaryByteArray(byteVal byte) []byte {
@@ -114,6 +121,63 @@ func (engine *DesEncryptor) writeDecryptionBufferToFile(decryptionBuffer *[][]by
 	}
 }
 
+func (encryptor *DesEncryptor) concurrentChunkEncryption(waitGroup *sync.WaitGroup, buffer *[]byte, bufferDataSize int, encryptionBuffer *[][]byte) {
+	defer waitGroup.Done()
+	encryptor.encryptChunk(buffer, bufferDataSize, encryptionBuffer)
+}
+
+/**
+Uses goroutines to encrypt the file in chunks
+*/
+func (encryptor *DesEncryptor) fastEncrypt(file *os.File) {
+	//	Concurrent encryption of multiple chunks
+	dataBuffer := make([][]byte, encryptor.ConcurrentPaths) //	holds the primary data to be encypted.
+	for i := 0; i < len(dataBuffer); i++ {
+		dataBuffer[i] = make([]byte, encryptor.Chunksize)
+	}
+	// var encryptionBuffer [][][]byte
+	encryptionBuffer := make([][][]byte, encryptor.ConcurrentPaths)
+	for i := 0; i < len(encryptionBuffer); i++ {
+		encryptionBuffer[i] = make([][]byte, encryptor.Chunksize)
+		for j := 0; j < len(encryptionBuffer[i][j]); j++ {
+			encryptionBuffer[i][j] = make([]byte, 8)
+		}
+	}
+
+	waitGroup := new(sync.WaitGroup)
+	chunkMap := make([]int, len(dataBuffer)) //	stores the count of bytes w.r.t every chunk.
+	var err error
+	cnt := 0
+	for err != io.EOF {
+		err = nil
+		bytesread := 0
+		chunkCount := 0
+		for i := 0; i < len(dataBuffer); i++ {
+			bytesread, err = file.Read(dataBuffer[i])
+			if err != nil {
+				if err != io.EOF {
+					log.Println("Problem reading from primary file", err)
+				}
+				break
+			}
+			waitGroup.Add(1)
+			go encryptor.concurrentChunkEncryption(waitGroup, &dataBuffer[i], bytesread, &encryptionBuffer[i])
+			chunkCount += 1
+			chunkMap[i] = bytesread
+		}
+		waitGroup.Wait()
+		// if chunkCount == len(dataBuffer) {
+		// 	fmt.Println("chunkCount and len(dataBuffer) are same")
+		// }
+		//	Write encryption buffer into the file
+		for i := 0; i < chunkCount; i++ {
+			encryptor.writeEncryptionBufferToFile(&encryptionBuffer[i], chunkMap[i], encryptor.encryptionFilename)
+		}
+		cnt += 1
+		// fmt.Println("End of a loop, cnt:", cnt)
+	}
+}
+
 /**
 Reads in a chunk of byte-data from file.
 Encrypts it.
@@ -136,27 +200,37 @@ func (encryptor *DesEncryptor) runEncryption(filename string) {
 	}
 
 	var buffer []byte
-	buffer = make([]byte, bufferSize)
+	buffer = make([]byte, encryptor.Chunksize)
 	var encryptionBuffer [][]byte
-	encryptionBuffer = make([][]byte, bufferSize)
-	for i := 0; i < bufferSize; i++ {
+	encryptionBuffer = make([][]byte, encryptor.Chunksize)
+	for i := 0; i < encryptor.Chunksize; i++ {
 		encryptionBuffer[i] = make([]byte, 8)
 	}
 
-	for {
-		bytesread, err := file.Read(buffer)
-		if err != nil {
-			if err != io.EOF {
-				log.Fatalln("Problem while reading the contents of the file.")
+	if encryptor.Fastmode == true {
+		log.Println("Fastmode enabled encryption...")
+		concurrentStart := time.Now()
+		encryptor.fastEncrypt(file)
+		concurrentElapsed := time.Since(concurrentStart)
+		log.Println("The total time for fast mode: ", concurrentElapsed)
+	} else {
+		log.Println("Using normal mode encryption...")
+		normalStart := time.Now()
+		for {
+			bytesread, err := file.Read(buffer)
+			if err != nil {
+				if err != io.EOF {
+					log.Fatalln("Problem while reading the contents of the file.")
+				}
+				break
 			}
-			break
+			encryptor.encryptChunk(&buffer, bytesread, &encryptionBuffer)
+			//	Write encryptionBuffer into file.
+			encryptor.writeEncryptionBufferToFile(&encryptionBuffer, bytesread, encryptor.encryptionFilename)
+			// fmt.Println("bytesread:", bytesread, "bytes to string:", string(buffer[:bytesread]))
 		}
-
-		encryptor.encryptChunk(&buffer, bytesread, &encryptionBuffer)
-		//	Write encryptionBuffer into file.
-		encryptor.writeEncryptionBufferToFile(&encryptionBuffer, bytesread, encryptor.encryptionFilename)
-
-		// fmt.Println("bytesread:", bytesread, "bytes to string:", string(buffer[:bytesread]))
+		normalElapsed := time.Since(normalStart)
+		log.Println("The total time for normal mode: ", normalElapsed)
 	}
 }
 
@@ -224,12 +298,12 @@ func (encryptor *DesEncryptor) EncryptFile(filename string) bool {
 		return false
 	}
 
-	//	File encryption is successful. Delete the primary file from disk.
-	err = os.Remove(filename)
-	if err != nil {
-		log.Println("Encryption failure for file:", encryptor.encryptionFilename, err)
-		return false
-	}
+	// //	File encryption is successful. Delete the primary file from disk.
+	// err = os.Remove(filename)
+	// if err != nil {
+	// 	log.Println("Encryption failure for file:", encryptor.encryptionFilename, err)
+	// 	return false
+	// }
 
 	log.Println("File-Encryption procedure complete...")
 	return true
@@ -281,8 +355,20 @@ func (engine *DesEncryptor) DecryptFile(filename string) bool {
 	return true
 }
 
+/**
+Reads the DES configuration file. Initializes the struct members.
+*/
+func (engine *DesEncryptor) readConfigurationFile(configFilename string) {
+	data, err := ioutil.ReadFile(configFilename)
+	if err != nil {
+		log.Fatalln("Problem reading the DES configuration file...", err)
+	}
+	err = json.Unmarshal(data, &engine)
+}
+
 func (engine *DesEncryptor) Init(filename string) {
 	log.Println("Initializing FES engine...")
+	engine.readConfigurationFile("des_config.json")
 	engine.cipher.Init(filename)
 	log.Println("FES engine intialization complete...")
 }
