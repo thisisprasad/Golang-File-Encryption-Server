@@ -166,15 +166,11 @@ func (encryptor *DesEncryptor) fastEncrypt(file *os.File) {
 			chunkMap[i] = bytesread
 		}
 		waitGroup.Wait()
-		// if chunkCount == len(dataBuffer) {
-		// 	fmt.Println("chunkCount and len(dataBuffer) are same")
-		// }
-		//	Write encryption buffer into the file
+
 		for i := 0; i < chunkCount; i++ {
 			encryptor.writeEncryptionBufferToFile(&encryptionBuffer[i], chunkMap[i], encryptor.encryptionFilename)
 		}
 		cnt += 1
-		// fmt.Println("End of a loop, cnt:", cnt)
 	}
 }
 
@@ -227,10 +223,57 @@ func (encryptor *DesEncryptor) runEncryption(filename string) {
 			encryptor.encryptChunk(&buffer, bytesread, &encryptionBuffer)
 			//	Write encryptionBuffer into file.
 			encryptor.writeEncryptionBufferToFile(&encryptionBuffer, bytesread, encryptor.encryptionFilename)
-			// fmt.Println("bytesread:", bytesread, "bytes to string:", string(buffer[:bytesread]))
 		}
 		normalElapsed := time.Since(normalStart)
 		log.Println("The total time for normal mode: ", normalElapsed)
+	}
+}
+
+func (engine *DesEncryptor) concurrentChunkDecryption(waitGroup *sync.WaitGroup, buffer *[]byte, bufferDataSize int, decryptionBuffer *[][]byte) {
+	defer waitGroup.Done()
+	engine.decryptChunk(buffer, bufferDataSize, decryptionBuffer)
+}
+
+func (engine *DesEncryptor) fastDecrypt(file *os.File) {
+	dataBuffer := make([][]byte, engine.ConcurrentPaths) //	holds the primary data to be decrypted.
+	for i := 0; i < len(dataBuffer); i++ {
+		dataBuffer[i] = make([]byte, engine.Chunksize)
+	}
+	decryptionBuffer := make([][][]byte, engine.ConcurrentPaths)
+	for i := 0; i < len(decryptionBuffer); i++ {
+		decryptionBuffer[i] = make([][]byte, engine.Chunksize)
+		for j := 0; j < len(decryptionBuffer[i][j]); j++ {
+			decryptionBuffer[i][j] = make([]byte, 8)
+		}
+	}
+	waitGroup := new(sync.WaitGroup)
+	chunkMap := make([]int, len(dataBuffer))
+	var err error
+	cnt := 0
+	for err != io.EOF {
+		err = nil
+		bytesread := 0
+		chunkCount := 0
+		for i := 0; i < len(dataBuffer); i++ {
+			bytesread, err = file.Read(dataBuffer[i])
+			if err != nil {
+				if err != io.EOF {
+					log.Println("Problem reading from primary file", err)
+				}
+				break
+			}
+			waitGroup.Add(1)
+			go engine.concurrentChunkDecryption(waitGroup, &dataBuffer[i], bytesread, &decryptionBuffer[i])
+			chunkCount += 1
+			chunkMap[i] = bytesread
+		}
+		waitGroup.Wait()
+
+		for i := 0; i < chunkCount; i++ {
+			//	write decryption buffer to file
+			engine.writeDecryptionBufferToFile(&decryptionBuffer[i], chunkMap[i], engine.decryptionFilename)
+		}
+		cnt += 1
 	}
 }
 
@@ -238,31 +281,44 @@ func (encryptor *DesEncryptor) runEncryption(filename string) {
 Decrypt the bytes of the encrypted file
 */
 func (engine *DesEncryptor) runDecryption(filename string) {
-	var buffer []byte = make([]byte, bufferSize)
-	var decryptionBuffer [][]byte = make([][]byte, bufferSize)
-	for i := 0; i < bufferSize; i++ {
-		decryptionBuffer[i] = make([]byte, 8)
+	file, ferr := os.Open(engine.encryptionFilename)
+	defer file.Close()
+	if ferr != nil {
+		log.Fatalln("Problem opening encrypted file...Filename:", engine.encryptionFilename, ferr)
+		return
+	}
+
+	if engine.Fastmode == true {
+		log.Println("Fastmode enabled decryption...")
+		concurrentStart := time.Now()
+		engine.fastDecrypt(file)
+		concurrentElapsed := time.Since(concurrentStart)
+		log.Println("The total decryption time for fast mode: ", concurrentElapsed)
+	} else {
+		log.Println("Decryption in normal mode...")
+		var buffer []byte = make([]byte, engine.Chunksize)
+		var decryptionBuffer [][]byte = make([][]byte, engine.Chunksize)
+		for i := 0; i < engine.Chunksize; i++ {
+			decryptionBuffer[i] = make([]byte, 8)
+		}
+		normalStart := time.Now()
+		for {
+			bytesread, err := file.Read(buffer)
+			if err != nil {
+				if err != io.EOF {
+					log.Fatalln("Problem reading encrypted file", err)
+				}
+				break
+			}
+			engine.decryptChunk(&buffer, bytesread, &decryptionBuffer)
+			//	Write decryptionBuffer into file
+			engine.writeDecryptionBufferToFile(&decryptionBuffer, bytesread, engine.decryptionFilename)
+		}
+		normalElapsed := time.Since(normalStart)
+		log.Println("Total decryption time in normal mode: ", normalElapsed)
 	}
 
 	// fmt.Println("Encryption filename:", engine.encryptionFilename)
-	file, ferr := os.Open(engine.encryptionFilename)
-	if ferr != nil {
-		log.Fatalln("Problem opening encrypted file...Filename:", engine.encryptionFilename, ferr)
-	}
-	for {
-		bytesread, err := file.Read(buffer)
-		if err != nil {
-			if err != io.EOF {
-				log.Fatalln("Problem reading encrypted file", err)
-			}
-			break
-		}
-		engine.decryptChunk(&buffer, bytesread, &decryptionBuffer)
-		//	Write decryptionBuffer into file
-		engine.writeDecryptionBufferToFile(&decryptionBuffer, bytesread, engine.decryptionFilename)
-
-		// fmt.Println("Decryption, bytesread:", bytesread, " bytes to string:", string(buffer[:bytesread]))
-	}
 }
 
 /**

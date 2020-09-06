@@ -1,0 +1,5 @@
+{
+	"fastmode": true,
+	"threadcount": 8,
+	"buffersize": 100000
+}
