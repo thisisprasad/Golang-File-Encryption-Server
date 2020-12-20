@@ -354,12 +354,8 @@ func (encryptor *DesEncryptor) EncryptFile(filename string) bool {
 		return false
 	}
 
-	// //	File encryption is successful. Delete the primary file from disk.
-	// err = os.Remove(filename)
-	// if err != nil {
-	// 	log.Println("Encryption failure for file:", encryptor.encryptionFilename, err)
-	// 	return false
-	// }
+	log.Println("Deleting primary file:", filename)
+	os.Remove(filename)
 
 	log.Println("File-Encryption procedure complete...")
 	return true
@@ -406,6 +402,9 @@ func (engine *DesEncryptor) DecryptFile(filename string) bool {
 		log.Println("Decryption failed! Try again")
 		return false
 	}
+
+	log.Println("Removing encrypted file: ", engine.encryptionFilename)
+	os.Remove(engine.encryptionFilename)
 
 	log.Println("Decryption procedure complete...")
 	return true

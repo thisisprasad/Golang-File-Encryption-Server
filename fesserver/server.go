@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	"strconv"
 
 	"github.com/bitly/go-simplejson"
 	"github.com/gorilla/mux"
@@ -84,5 +85,7 @@ func Start() {
 	initServer("config.json", &prop)
 	router := mux.NewRouter().StrictSlash(true)
 	initServices(router)
-	log.Fatalln(http.ListenAndServe(":8080", router))
+	port := ":" + strconv.Itoa(prop.Port)
+	log.Fatalln(http.ListenAndServe(port, router))
+	log.Println("Application started on port: ", prop.Port)
 }
