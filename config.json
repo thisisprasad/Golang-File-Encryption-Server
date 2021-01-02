@@ -1,6 +1,5 @@
 {
 	"name": "FES App Server",
-	"port": 9090,
-    "protocol": "HTTP",
-    "dbFilePath": "./storage/db.gosotore" 
+	"port": 8080,
+    "protocol": "HTTP"
 }

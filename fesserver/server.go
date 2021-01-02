@@ -86,6 +86,6 @@ func Start() {
 	router := mux.NewRouter().StrictSlash(true)
 	initServices(router)
 	port := ":" + strconv.Itoa(prop.Port)
+	log.Println("Starting application on port: ", prop.Port)
 	log.Fatalln(http.ListenAndServe(port, router))
-	log.Println("Application started on port: ", prop.Port)
 }
