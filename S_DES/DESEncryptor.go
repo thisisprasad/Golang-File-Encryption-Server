@@ -2,6 +2,7 @@ package S_DES
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"log"
@@ -23,6 +24,7 @@ type DesEncryptor struct {
 	Fastmode                bool `json:"fastmode"`
 	ConcurrentPaths         int  `json:"threadcount"`
 	Chunksize               int  `json:"buffersize"`
+	FolderConcurrentPaths   int  `json:"folderConcurrentCount"`
 }
 
 func (encryptor *DesEncryptor) getBinaryByteArray(byteVal byte) []byte {
@@ -362,6 +364,127 @@ func (encryptor *DesEncryptor) EncryptFile(filename string) bool {
 }
 
 /**
+public API for encrypting folder.
+@return: boolean value. True if encryption is successful. Otherwise false is returned.
+*/
+func (encryptor *DesEncryptor) EncryptFolder(foldername string, isRecursive bool) {
+	log.Println("Encryption started for folder -", foldername)
+	if encryptor.Fastmode == true {
+		encryptor.fastFolderEncrypt(foldername, isRecursive)
+	} else {
+		encryptor.folderEncrypt(foldername, isRecursive)
+	}
+	log.Println("Folder encrypted successfully...")
+}
+
+func (encryptor *DesEncryptor) folderEncrypt(foldername string, isRecursive bool) {
+}
+
+/**
+Concurrently encrypts files of the folder
+*/
+func (encryptor *DesEncryptor) fastFolderEncrypt(foldername string, isRecursive bool) {
+	fileList, err := encryptor.getFileList(foldername)
+	folderList, err := encryptor.getFolderList(foldername)
+
+	log.Println("Encrypting folder - ", foldername)
+
+	if err != nil {
+		log.Println("Error occurred while encrypting folder -", err)
+	}
+
+	// resultList := make([]bool, encryptor.FolderConcurrentPaths)
+	fileChannels := make([]chan bool, encryptor.FolderConcurrentPaths)
+	for i := 0; i < encryptor.FolderConcurrentPaths; i++ {
+		fileChannels[i] = make(chan bool)
+	}
+
+	//	Encrypt files first
+	offset := 0
+	for offset < len(fileList) {
+		count := 0
+		for i := offset; i < IntMin(offset+encryptor.FolderConcurrentPaths, len(fileList)); i++ {
+			count += 1
+			filename := foldername + "/" + fileList[i]
+			// go encryptor.concurrentFileEncrypt(filename, fileChannels[i])
+			log.Println("Encrypting file: ", fileList[i])
+			encryptor.EncryptFile(filename)
+			// encryptor.concurrentFileEncrypt(filename, fileChannels[i])
+		}
+		// for i := offset; i < IntMin(offset+encryptor.FolderConcurrentPaths, len(fileList)); i++ {
+		// 	resultList[i] = <-fileChannels[i]
+		// 	//	Notify the result!
+		// }
+
+		offset += count
+	}
+
+	//	List of folders are encrypted sequentially.
+	if isRecursive {
+		for _, directory := range folderList {
+			encryptor.fastFolderEncrypt(foldername+"/"+directory, isRecursive)
+		}
+	}
+
+	log.Println("Encryption of folder - ", foldername, " complete")
+
+	fmt.Println("fileList:", fileList)
+	fmt.Println("folderList:", folderList)
+}
+
+func (encryptor *DesEncryptor) concurrentFileEncrypt(filename string, channel chan bool) {
+	result := encryptor.EncryptFile(filename)
+	channel <- result
+}
+
+/**
+Returns a list of files present at path/folder at @parmam foldername
+*/
+func (encryptor *DesEncryptor) getFileList(foldername string) ([]string, error) {
+	var fileList []string
+	items, err := ioutil.ReadDir(foldername)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range items {
+		itemPath := foldername + "/" + item.Name()
+		file, err := os.Stat(itemPath)
+		if err != nil {
+			log.Println("Error occurred:", err)
+			return nil, err
+		} else if !file.Mode().IsDir() {
+			fileList = append(fileList, item.Name())
+		}
+	}
+
+	return fileList, err
+}
+
+/**
+Returns a list of folders present on a path/folder @param foldername
+*/
+func (encryptor *DesEncryptor) getFolderList(foldername string) ([]string, error) {
+	var folderList []string
+	items, err := ioutil.ReadDir(foldername)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, item := range items {
+		itemPath := foldername + "/" + item.Name()
+		file, err := os.Stat(itemPath)
+		if err != nil {
+			return nil, err
+		} else if file.Mode().IsDir() {
+			folderList = append(folderList, item.Name())
+		}
+	}
+
+	return folderList, err
+}
+
+/**
 Public Decryption API.
 @return: boolean value. True if decryption is successful and decrypted file
 		is created successfully on the disk. Otherwise false is returned.
@@ -408,6 +531,62 @@ func (engine *DesEncryptor) DecryptFile(filename string) bool {
 
 	log.Println("Decryption procedure complete...")
 	return true
+}
+
+/**
+public API for decrypting folder.
+@return: boolean value. True if decryption is successful. Otherwise false is returned.
+*/
+func (encryptor *DesEncryptor) DecryptFolder(foldername string, isRecursive bool) {
+	log.Println("Encryption started for folder -", foldername)
+	encryptor.fastFolderDecrypt(foldername, isRecursive)
+	log.Println("Folder encrypted successfully...")
+}
+
+func (encryptor *DesEncryptor) fastFolderDecrypt(foldername string, isRecursive bool) {
+	fileList, err := encryptor.getFileList(foldername)
+	folderList, err := encryptor.getFolderList(foldername)
+
+	log.Println("Decrypting folder - ", foldername)
+
+	if err != nil {
+		log.Println("Error occurred while decrypting folder -", err)
+	}
+
+	// resultList := make([]bool, encryptor.FolderConcurrentPaths)
+	fileChannels := make([]chan bool, encryptor.FolderConcurrentPaths)
+	for i := 0; i < encryptor.FolderConcurrentPaths; i++ {
+		fileChannels[i] = make(chan bool)
+	}
+
+	//	Decrypt files first
+	offset := 0
+	for offset < len(fileList) {
+		count := 0
+		for i := offset; i < IntMin(offset+encryptor.FolderConcurrentPaths, len(fileList)); i++ {
+			count += 1
+			filename := foldername + "/" + fileList[i]
+			// go encryptor.concurrentFileEncrypt(filename, fileChannels[i])
+			log.Println("Decrypting file: ", fileList[i])
+			encryptor.DecryptFile(filename)
+			// encryptor.concurrentFileEncrypt(filename, fileChannels[i])
+		}
+		// for i := offset; i < IntMin(offset+encryptor.FolderConcurrentPaths, len(fileList)); i++ {
+		// 	resultList[i] = <-fileChannels[i]
+		// 	//	Notify the result!
+		// }
+
+		offset += count
+	}
+
+	//	List of folders are encrypted sequentially.
+	if isRecursive {
+		for _, directory := range folderList {
+			encryptor.fastFolderEncrypt(foldername+"/"+directory, isRecursive)
+		}
+	}
+
+	log.Println("Decryption of folder - ", foldername, " complete")
 }
 
 /**

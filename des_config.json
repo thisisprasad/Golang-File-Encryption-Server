@@ -1,5 +1,6 @@
 {
 	"fastmode": true,
 	"threadcount": 8,
-	"buffersize": 1048576
+    "buffersize": 1048576,
+    "folderConcurrentCount": 5
 }

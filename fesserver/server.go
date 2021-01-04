@@ -72,6 +72,37 @@ func decryptFile(w http.ResponseWriter, r *http.Request) {
 	WriteToResponseStream(w, response.SetToSimpleJSON(), "application/json")
 }
 
+func encryptFolder(w http.ResponseWriter, r *http.Request) {
+	// var response OperationResponse
+	var isRecursive bool
+	foldername, ok := r.URL.Query()["foldername"]
+	if !ok {
+		log.Println("No parameter 'foldername' in the URL")
+	}
+	recursive, ok := r.URL.Query()["recursive"]
+	if recursive[0] == "true" {
+		isRecursive = true
+	} else {
+		isRecursive = false
+	}
+	prop.Fesengine.EncryptFolder(foldername[0], isRecursive)
+}
+
+func decryptFolder(w http.ResponseWriter, r *http.Request) {
+	var isRecursive bool
+	foldername, ok := r.URL.Query()["foldername"]
+	if !ok {
+		log.Println("No parameter 'foldername' in the URL")
+	}
+	recursive, ok := r.URL.Query()["recursive"]
+	if recursive[0] == "true" {
+		isRecursive = true
+	} else {
+		isRecursive = false
+	}
+	prop.Fesengine.DecryptFolder(foldername[0], isRecursive)
+}
+
 /**
 Initializes the routing for REST services
 */
@@ -79,6 +110,8 @@ func initServices(router *mux.Router) {
 	router.HandleFunc("/", appHome).Methods("GET")
 	router.HandleFunc("/encrypt", encryptFile).Methods("GET")
 	router.HandleFunc("/decrypt", decryptFile).Methods("GET")
+	router.HandleFunc("/encryptFolder", encryptFolder).Methods("GET")
+	router.HandleFunc("/decryptFolder", decryptFolder).Methods("GET")
 }
 
 func Start() {

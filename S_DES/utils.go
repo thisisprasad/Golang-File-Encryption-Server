@@ -64,3 +64,10 @@ func Substr(s string, startPos int, length int) string {
 
 	return res
 }
+
+func IntMin(a int, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
