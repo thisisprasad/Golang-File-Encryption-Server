@@ -53,9 +53,9 @@ The file contains colon ```:``` separated key pair values. Following is the brie
     "buffersize": 1048576
 }
 ```
-fastmode - boolean attribute. If set to true, then encryption of a file will be done multithreaded manner.
-threadcount - Integer attribute. Defines how many buffers will be encrypted concurrently at a time.
-buffersize - Integer attribute. Defines the size of the buffer in bytes which will be read from file, encrypted and written back to disk. Default value is ```1048576``` i.e 1 MB.
+* **fastmode** - boolean attribute. If set to true, then encryption of a file will be done multithreaded manner.
+* **threadcount** - Integer attribute. Defines how many buffers will be encrypted concurrently at a time.
+* **buffersize** - Integer attribute. Defines the size of the buffer in bytes which will be read from file, encrypted and written back to disk. Default value is ```1048576``` i.e 1 MB.
 
 3. config.json - Defines the configurations of the application server.
 ```
@@ -65,9 +65,9 @@ buffersize - Integer attribute. Defines the size of the buffer in bytes which wi
     "protocol": "HTTP"
 }
 ```
-name - Name of the application
-port - port on which app server listens for request.
-protocol - name of the protocol used by the server.
+* **name** - Name of the application
+* **port** - port on which app server listens for request.
+* **protocol** - name of the protocol used by the server.
 
 ## Want to contribute
 1. Explain the issue that must be fixed or a feature that must to be added.
