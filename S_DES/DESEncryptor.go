@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"runtime"
 	"sync"
 	"time"
 )
@@ -327,6 +328,14 @@ func (engine *DesEncryptor) runDecryption(filename string) {
 }
 
 /**
+copied from stackoverflow.
+*/
+func memory_usage(m *runtime.MemStats) string {
+	runtime.ReadMemStats(m)
+	return fmt.Sprintf("system memory: %dMB; heap alloc: %dMB; heap idle-released: %dMB", int((m.Sys/1024)/1024), int((m.HeapAlloc/1024)/1024), int(((m.HeapIdle-m.HeapReleased)/1024)/1024))
+}
+
+/**
 public File-encryption API.
 @return: boolean value. True if encryption is successful and encrypted file
 		is created successfully on the disk. Otherwise false is returned.
@@ -334,6 +343,8 @@ public File-encryption API.
 func (encryptor *DesEncryptor) EncryptFile(filename string) bool {
 	log.Println("file for encryption:", filename)
 	log.Println("File-Encryption procedure started...")
+
+	fmt.Println("Memory stats before encryption: ", memory_usage(&runtime.MemStats{}))
 
 	encryptor.filename = filename
 	encryptor.encryptionFilename = filename + ".enc"
@@ -370,18 +381,23 @@ func (encryptor *DesEncryptor) EncryptFile(filename string) bool {
 public API for encrypting folder.
 @return: boolean value. True if encryption is successful. Otherwise false is returned.
 */
-func (encryptor *DesEncryptor) EncryptFolder(foldername string, isRecursive bool) {
+func (encryptor *DesEncryptor) EncryptFolder(foldername string, isRecursive bool) map[string]bool {
 	log.Println("Encryption started for folder -", foldername)
-	encryptor.executeFolderEncryption(foldername, isRecursive)
+	executionStart := time.Now()
+	resultMap := encryptor.executeFolderEncryption(foldername, isRecursive)
+	executionElapsed := time.Since(executionStart)
 	log.Println("Folder - ", foldername, " encrypted successfully...")
+	log.Println("Total time required for folder encryption - ", executionElapsed)
+	return resultMap
 }
 
 /**
 Concurrently encrypts files of the folder
 */
-func (encryptor *DesEncryptor) executeFolderEncryption(foldername string, isRecursive bool) {
+func (encryptor *DesEncryptor) executeFolderEncryption(foldername string, isRecursive bool) map[string]bool {
 	fileList, err := encryptor.getFileList(foldername)
 	folderList, err := encryptor.getFolderList(foldername)
+	var folderFileEncryptionResult = make(map[string]bool)
 
 	fmt.Println("fileList:", fileList)
 	fmt.Println("folderList:", folderList)
@@ -398,14 +414,20 @@ func (encryptor *DesEncryptor) executeFolderEncryption(foldername string, isRecu
 		}
 		filename := foldername + "/" + fileList[i]
 		log.Println("Encrypting file: ", fileList[i])
-		encryptor.EncryptFile(filename)
+		res := encryptor.EncryptFile(filename)
+		folderFileEncryptionResult[filename] = res
 	}
 	//	List of folders are encrypted sequentially.
 	if isRecursive {
 		for _, directory := range folderList {
-			encryptor.executeFolderEncryption(foldername+"/"+directory, isRecursive)
+			nestedFolderResultMap := encryptor.executeFolderEncryption(foldername+"/"+directory, isRecursive)
+			for nestedFileName, result := range nestedFolderResultMap {
+				folderFileEncryptionResult[nestedFileName] = result
+			}
 		}
 	}
+
+	return folderFileEncryptionResult
 }
 
 /**
@@ -473,8 +495,6 @@ func (engine *DesEncryptor) DecryptFile(filename string) bool {
 	permissions := 0644
 	engine.decryptionFileConnector, err =
 		os.OpenFile(engine.decryptionFilename, os.O_APPEND|os.O_WRONLY, (os.FileMode)(permissions))
-	// file, err := os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, (os.FileMode)(permissions))
-	// engine.cipher.Init("des_input.txt")
 	engine.runDecryption(filename)
 	engine.decryptionFileConnector.Close()
 

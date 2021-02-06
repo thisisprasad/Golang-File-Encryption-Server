@@ -73,7 +73,6 @@ func decryptFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func encryptFolder(w http.ResponseWriter, r *http.Request) {
-	// var response OperationResponse
 	var isRecursive bool
 	foldername, ok := r.URL.Query()["foldername"]
 	if !ok {
@@ -85,7 +84,15 @@ func encryptFolder(w http.ResponseWriter, r *http.Request) {
 	} else {
 		isRecursive = false
 	}
-	prop.Fesengine.EncryptFolder(foldername[0], isRecursive)
+	resultMap := prop.Fesengine.EncryptFolder(foldername[0], isRecursive)
+	jsonResponse, err := json.Marshal(resultMap)
+	if err != nil {
+		log.Println("Problem sending back response. Folder encryption might be successful. Check the folder contents.")
+	}
+	w.Header().Set("Content-type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(resultMap)
+	w.Write(jsonResponse)
 }
 
 func decryptFolder(w http.ResponseWriter, r *http.Request) {
