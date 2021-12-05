@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fes/fesserver"
+	"fes/cli/cmd"
 	"fmt"
 )
 
 func main() {
 	fmt.Println("App starts from here...")
 
-	fesserver.Start()
+	cmd.Execute()
 }

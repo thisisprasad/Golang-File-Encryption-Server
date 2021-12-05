@@ -486,7 +486,9 @@ func (engine *DesEncryptor) DecryptFile(filename string) bool {
 	log.Println("Decryption procedure started...")
 
 	engine.decryptionFilename = filename
-	engine.encryptionFilename = filename + ".enc"
+	if filename[len(filename)-4:] != ".enc" {
+		engine.encryptionFilename = filename + ".enc"
+	}
 	var err error
 	engine.decryptionFileConnector, err = os.Create(engine.decryptionFilename)
 	if err != nil {

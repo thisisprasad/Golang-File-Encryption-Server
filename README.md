@@ -9,12 +9,42 @@ The encryption and decryption operation are exposed using REST APIs(The usage is
 1. Clone the project
 2. Open the folder in command prompt
 3. Run "go build"
-4. Run "fes"
-5. For encrypting a file, send a HTTP GET request using the url: http://localhost:8080/encrypt?filename=YourFileName. The server creates a file named as YourFileName.enc at the same location where the original file is present.
-6. For decrypting a file, send a HTTP GET request using the url: http://localhost:8080/decrypt?filename=YourFileName. In this case, only the name of the file and not the ".enc" should be sent through the url. The file is decrypted and stored at the same location of the encrypted file.
+4. The application is shipped as a CLI tool. User can perform encryption and decryption of files from terminal by simply running the commands.
+<br />
+
+### Encryption
+* Run the below command to encrypt a file.
+```
+fes encryptfile --filepath=</path/to/your/file>
+```
+<br />
+
+### Decryption
+* Run the below command to encrypt a file.
+```
+fes encryptfile --filepath=</path/to/your/file>
+```
+<br />
+
+5. The application provides a way to set up a HTTP server through the CLI commands.
+<br />
+Run the below command to setup the HTTP server.
+```
+fes startServer
+```
+The above command will spawn up a HTTP server with encryption and decryption endpoints.
+<br />
+
+=> For encrypting a file, send a HTTP GET request using the url: http://localhost:8080/encrypt?filename=YourFileName. The server creates a file named as YourFileName.enc at the same location where the original file is present.
+<br />
+
+=> For decrypting a file, send a HTTP GET request using the url: http://localhost:8080/decrypt?filename=YourFileName. In this case, only the name of the file and not the ".enc" should be sent through the url. The file is decrypted and stored at the same location of the encrypted file.
 
 ## Dependencies
-1. [gorilla-mux](https://github.com/gorilla/mux): A powerful HTTP router and URL matcher for building Go web servers with 
+1. [gorilla-mux](https://github.com/gorilla/mux): A powerful HTTP router and URL matcher for building Go web servers with.
+2. [cobra-CLI](https://github.com/spf13/cobra): Cobra is both a library for creating powerful modern CLI applications as well as a program to generate applications and command files.
+
+NOTE:- Indirect dependencies are not listed here.
 
 <br>
 
