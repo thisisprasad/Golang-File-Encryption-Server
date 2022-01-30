@@ -20,9 +20,9 @@ fes encryptfile --filepath=</path/to/your/file>
 <br />
 
 ### Decryption
-* Run the below command to encrypt a file.
+* Run the below command to decrypt a file.
 ```
-fes encryptfile --filepath=</path/to/your/file>
+fes decryptfile --filepath=</path/to/your/file>
 ```
 <br />
 
