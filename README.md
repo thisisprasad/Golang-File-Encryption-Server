@@ -2,7 +2,7 @@
 
 [![Maintenance](https://img.shields.io/badge/Maintained%3F-yes-green.svg)](https://GitHub.com/Naereen/StrapDown.js/graphs/commit-activity) ![License](https://img.shields.io/cran/l/devtools)
 
-A file encryption-decryption HTTP server. The server encrypts or decrypts the file present on the server. File encryption and decryption is performed using [DES](https://www.cs.uri.edu/cryptography/dessimplified.htm#:~:text=Simplified%20DES%20is%20an%20algorithm,on%20blocks%20of%2012%20bits.) algorithm.
+A file encryption-decryption HTTP server. The server encrypts or decrypts the file present on the server. File encryption and decryption is performed using [Simplified DES](https://www.cs.uri.edu/cryptography/dessimplified.htm#:~:text=Simplified%20DES%20is%20an%20algorithm,on%20blocks%20of%2012%20bits.) algorithm.
 The encryption and decryption operation are exposed using REST APIs(The usage is explained below). For efficient routing and implementation of REST APIs gorilla mux server is used.
 
 ## How To Use
